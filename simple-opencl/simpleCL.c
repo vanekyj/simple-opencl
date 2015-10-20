@@ -193,7 +193,7 @@ char* _sclLoadProgramSource( const char *filename )
 	FILE *fh; 
 	char *source;
 	
-	fh = fopen( filename, "r" );
+	fh = fopen( filename, "rb" );
 	if ( fh == NULL ){
 		fprintf( stderr, "Error on loadProgramSource");
 		sclPrintErrorFlags( CL_INVALID_PROGRAM );
@@ -357,7 +357,7 @@ void sclPrintDeviceNamePlatforms( sclHard* hardList, int found ) {
 		clGetPlatformInfo( hardList[i].platform, CL_PLATFORM_NAME, sizeof(cl_char)*1024, platformName, NULL );	
 		clGetPlatformInfo( hardList[i].platform, CL_PLATFORM_VENDOR, sizeof(cl_char)*1024, platformVendor, NULL );
 		clGetDeviceInfo( hardList[i].device, CL_DEVICE_NAME, sizeof(cl_char)*1024, deviceName, NULL );
-		fprintf( stdout, "\n Device %d \n Platform name: %s \n Vendor: %s \n Device name: %s", 
+		fprintf( stdout, "\n Device %d \n Platform name: %s \n Vendor: %s \n Device name: %s\n", 
 				hardList[i].devNum, platformName, platformVendor, deviceName );	
 	}
 
@@ -893,31 +893,45 @@ cl_mem sclMallocWrite( sclHard hardware, cl_int mode, size_t size, void* hostPoi
 	return buffer;
 }
 
-void sclWrite( sclHard hardware, size_t size, cl_mem buffer, void* hostPointer ) {
+void sclWrite( sclHard hardware, size_t size, cl_mem buffer, void* hostPointer, bool blocking, size_t offset ) {
 #ifdef DEBUG
 	cl_int err;
 
-	err = clEnqueueWriteBuffer( hardware.queue, buffer, CL_TRUE, 0, size, hostPointer, 0, NULL, NULL );
+	err = clEnqueueWriteBuffer( hardware.queue, buffer, blocking, offset, size, hostPointer, 0, NULL, NULL );
 	if ( err != CL_SUCCESS ) { 
 		fprintf( stderr,  "\nclWrite Error\n" );
 		sclPrintErrorFlags( err );
 	}   
 #else
-	clEnqueueWriteBuffer( hardware.queue, buffer, CL_TRUE, 0, size, hostPointer, 0, NULL, NULL );
+	clEnqueueWriteBuffer( hardware.queue, buffer, blocking, offset, size, hostPointer, 0, NULL, NULL );
 #endif
 }
 
-void sclRead( sclHard hardware, size_t size, cl_mem buffer, void *hostPointer ) {
+void sclRead( sclHard hardware, size_t size, cl_mem buffer, void *hostPointer, bool blocking, size_t offset ) {
 #ifdef DEBUG
 	cl_int err;
 
-	err = clEnqueueReadBuffer( hardware.queue, buffer, CL_TRUE, 0, size, hostPointer, 0, NULL, NULL );
+	err = clEnqueueReadBuffer( hardware.queue, buffer, blocking, offset, size, hostPointer, 0, NULL, NULL );
 	if ( err != CL_SUCCESS ) {
 		fprintf( stderr,  "\nclRead Error\n" );
 		sclPrintErrorFlags( err );
        	}
 #else
-	clEnqueueReadBuffer( hardware.queue, buffer, CL_TRUE, 0, size, hostPointer, 0, NULL, NULL );
+	clEnqueueReadBuffer( hardware.queue, buffer, blocking, offset, size, hostPointer, 0, NULL, NULL );
+#endif
+}
+
+void sclCopy( sclHard hardware, size_t size, cl_mem dst_buffer, cl_mem src_buffer, size_t dst_offset, size_t src_offset ) {
+#ifdef DEBUG
+	cl_int err;
+
+	err = clEnqueueCopyBuffer( hardware.queue, src_buffer, dst_buffer, src_offset, dst_offset, size, 0, NULL, NULL );
+	if ( err != CL_SUCCESS ) {
+		fprintf( stderr,  "\nclRead Error\n" );
+		sclPrintErrorFlags( err );
+       	}
+#else
+	clEnqueueCopyBuffer( hardware.queue, src_buffer, dst_buffer, src_offset, dst_offset, size, 0, NULL, NULL );
 #endif
 }
 
@@ -1158,6 +1172,57 @@ cl_event sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *
 	}
 
 	return event;
+}
+
+void sclPrintDeviceArrayInt( sclHard hardware, cl_mem buffer, size_t num, size_t offset) {
+	int *tmp = new int[num];
+	sclRead(hardware, num * sizeof(int), buffer, tmp, true, offset * sizeof(int)); 
+	fprintf( stdout, "\n");
+	for(size_t i=0; i < num; i++) {
+			fprintf( stdout,  "% 3d : %d\n", i+offset, tmp[i] );
+	}
+	delete tmp;
+}
+
+void sclPrintDeviceArrayFloat( sclHard hardware, cl_mem buffer, size_t num, size_t offset) {
+	float *tmp = new float[num];
+	sclRead(hardware, num * sizeof(float), buffer, tmp, true, offset * sizeof(float)); 
+	fprintf( stdout, "\n");
+	for(size_t i=0; i < num; i++) {
+			fprintf( stdout,  "% 3d : %f\n", i+offset, tmp[i] );
+	}
+	delete tmp;
+}
+
+void sclDumpDeviceArrayInt( sclHard hardware, char *file, cl_mem buffer, size_t num, size_t offset) {
+	int *tmp = new int[num];
+	sclRead(hardware, num * sizeof(int), buffer, tmp, true, offset * sizeof(int)); 
+	FILE *fid = fopen(file, "w");
+	if(fid == NULL) {
+		fprintf(stderr, "Error in sclDumpDeviceArrayFloat: Cannot open file\n");
+		return;
+	}
+	for(size_t i=0; i < num; i++) {
+			fprintf( fid,  "%d\n", tmp[i] );
+	}
+	delete tmp;
+	fclose(fid);
+}
+
+void sclDumpDeviceArrayFloat( sclHard hardware, char *file, cl_mem buffer, size_t num, size_t offset) {
+	float *tmp = new float[num];
+	sclRead(hardware, num * sizeof(float), buffer, tmp, true, offset * sizeof(float)); 
+	FILE *fid = fopen(file, "w");
+	if(fid == NULL) {
+		fprintf(stderr, "Error in sclDumpDeviceArrayFloat: Cannot open file\n");
+		return;
+	}
+	for(size_t i=0; i < num; i++) {
+		//if(tmp[i] != -1) //LLLLLLLLL
+			fprintf( fid,  "%f\n", tmp[i] );
+	}
+	delete tmp;
+	fclose(fid);
 }
 
 #ifdef __cplusplus

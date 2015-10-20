@@ -66,8 +66,9 @@ typedef struct {
 
 cl_mem 			sclMalloc( sclHard hardware, cl_int mode, size_t size );
 cl_mem 			sclMallocWrite( sclHard hardware, cl_int mode, size_t size, void* hostPointer );
-void 			sclWrite( sclHard hardware, size_t size, cl_mem buffer, void* hostPointer );
-void			sclRead( sclHard hardware, size_t size, cl_mem buffer, void *hostPointer );
+void 			sclWrite( sclHard hardware, size_t size, cl_mem buffer, void* hostPointer, bool blocking=true, size_t offset=0 );
+void			sclRead( sclHard hardware, size_t size, cl_mem buffer, void *hostPointer, bool blocking=true, size_t offset=0 );
+void			sclCopy( sclHard hardware, size_t size, cl_mem dst_buffer, cl_mem src_buffer, size_t dst_offset=0, size_t src_offset=0  );
 
 /* ######################################################## */
 
@@ -93,6 +94,10 @@ void			sclReleaseMemObject( cl_mem object );
 void 			sclPrintErrorFlags( cl_int flag );
 void 			sclPrintHardwareStatus( sclHard hardware );
 void 			sclPrintDeviceNamePlatforms( sclHard* hardList, int found );
+void			sclPrintDeviceArrayInt( sclHard hardware, cl_mem buffer, size_t num, size_t offset=0);
+void			sclPrintDeviceArrayFloat( sclHard hardware, cl_mem buffer, size_t num, size_t offset=0);
+void			sclDumpDeviceArrayFloat( sclHard hardware, char *file, cl_mem buffer, size_t num, size_t offset=0);
+void			sclDumpDeviceArrayInt( sclHard hardware, char *file, cl_mem buffer, size_t num, size_t offset=0);
 
 /* ######################################################## */
 
