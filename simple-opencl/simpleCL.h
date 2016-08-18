@@ -74,7 +74,8 @@ void			sclCopy( sclHard hardware, size_t size, cl_mem dst_buffer, cl_mem src_buf
 
 /* ####### inicialization of sclSoft structs  ############## */
 
-sclSoft 		sclGetCLSoftware( char* path, char* name, sclHard hardware );
+sclSoft 		sclGetCLSoftware( char* path, char* name, sclHard hardware ); //from file
+sclSoft 		sclGetCLSoftwareFromSource(char* source, char* name, sclHard hardware);
 
 /* ######################################################## */
 
@@ -103,13 +104,13 @@ void			sclDumpDeviceArrayInt( sclHard hardware, char *file, cl_mem buffer, size_
 
 /* ####### Device execution ############################### */
 
-cl_event 		sclLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size );
-cl_event		sclEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size );
-cl_event		sclSetArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size, 
+void 		sclLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size );
+void		sclEnqueueKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size);
+void		sclSetArgsLaunchKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
 						const char* sizesValues, ... );
-cl_event		sclSetArgsEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size, 
+void		sclSetArgsEnqueueKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
 						 const char* sizesValues, ... );
-cl_event		sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
+void		sclManageArgsLaunchKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
 						   const char* sizesValues, ... );
 
 /* ######################################################## */

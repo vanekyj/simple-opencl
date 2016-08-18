@@ -237,15 +237,21 @@ void _sclBuildProgram( cl_program program, cl_device_id devices, const char* pNa
 {
 #ifdef DEBUG
 	cl_int err;
-	char build_c[4096];
 	
 	err = clBuildProgram( program, 0, NULL, NULL, NULL, NULL );
    	if ( err != CL_SUCCESS ) {
+		char *build_log;
+		size_t ret_val_size;
+		clGetProgramBuildInfo(program, devices, CL_PROGRAM_BUILD_LOG, 0, NULL, &ret_val_size);
+		build_log = (char *)malloc(ret_val_size + 1);
 		fprintf( stderr,  "Error on buildProgram " );
 		sclPrintErrorFlags( err ); 
 		fprintf( stderr,  "\nRequestingInfo\n" );
-		clGetProgramBuildInfo( program, devices, CL_PROGRAM_BUILD_LOG, 4096, build_c, NULL );
-		fprintf( stderr,  "Build Log for %s_program:\n%s\n", pName, build_c );
+		clGetProgramBuildInfo(program, devices, CL_PROGRAM_BUILD_LOG, ret_val_size, build_log, NULL);
+		//build_log[ret_val_size] = '\0';
+		build_log[(ret_val_size < 4096) ? ret_val_size : 4096] = '\0';
+		fprintf(stderr, "Build Log for %s_program:\n%s\n", pName, build_log);
+		free(build_log);
 	}
 #else
 	clBuildProgram( program, 0, NULL, NULL, NULL, NULL );
@@ -270,12 +276,11 @@ cl_kernel _sclCreateKernel( sclSoft software ) {
 	return kernel;
 }
 
-cl_event sclLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size) {
-	cl_event myEvent=NULL;	
+void sclLaunchKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size) {
 #ifdef DEBUG
 	cl_int err;
 
-	err = clEnqueueNDRangeKernel( hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, &myEvent );
+	err = clEnqueueNDRangeKernel(hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, NULL);
 	if ( err != CL_SUCCESS ) {
 		fprintf( stderr,  "\nError on launchKernel %s", software.kernelName );
 		sclPrintErrorFlags(err); }
@@ -283,15 +288,14 @@ cl_event sclLaunchKernel( sclHard hardware, sclSoft software, size_t *global_wor
 	clEnqueueNDRangeKernel( hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, NULL );
 #endif
 	sclFinish( hardware );
-	return myEvent;
+	return;
 }
 
-cl_event sclEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size) {
-	cl_event myEvent=NULL;	
+void sclEnqueueKernel(sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size) {
 #ifdef DEBUG
 	cl_int err;
 
-	err = clEnqueueNDRangeKernel( hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, &myEvent );
+	err = clEnqueueNDRangeKernel(hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, NULL);
 	if ( err != CL_SUCCESS ) {
 		fprintf( stderr,  "\nError on launchKernel %s", software.kernelName );
 		sclPrintErrorFlags(err); }
@@ -299,7 +303,7 @@ cl_event sclEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_wo
 	clEnqueueNDRangeKernel( hardware.queue, software.kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, NULL );
 #endif
 
-	return myEvent;
+	return;
 		
 }
 
@@ -825,6 +829,29 @@ sclHard sclGetCPUHardware( int nDevice, int* found ) {
 	return hardware;
 }
 
+sclSoft sclGetCLSoftwareFromSource(char* source, char* name, sclHard hardware) {
+	sclSoft software;
+
+	sprintf(software.kernelName, "%s", name);
+
+	/* Create program objects from source
+	########################################################### */
+	software.program = _sclCreateProgram(source, hardware.context);
+	/* ########################################################### */
+
+	/* Build the program (compile it)
+	############################################ */
+	_sclBuildProgram(software.program, hardware.device, name);
+	/* ############################################ */
+
+	/* Create the kernel object
+	########################################################################## */
+	software.kernel = _sclCreateKernel(software);
+	/* ########################################################################## */
+
+	return software;
+}
+
 sclSoft sclGetCLSoftware( char* path, char* name, sclHard hardware ){
 	sclSoft software;
 	/* Load program source
@@ -832,25 +859,7 @@ sclSoft sclGetCLSoftware( char* path, char* name, sclHard hardware ){
 	char *source = _sclLoadProgramSource( path );
 	/* ########################################################### */
 	
-	sprintf( software.kernelName, "%s", name);
-	
-	/* Create program objects from source
-	 ########################################################### */
-	software.program = _sclCreateProgram( source, hardware.context );
-	/* ########################################################### */
-	
-	/* Build the program (compile it)
-   	 ############################################ */
-   	_sclBuildProgram( software.program, hardware.device, name );
-   	/* ############################################ */
-   	
-   	/* Create the kernel object
-	 ########################################################################## */
-	software.kernel = _sclCreateKernel( software );
-	/* ########################################################################## */
-
-	return software;
-	
+	return sclGetCLSoftwareFromSource(source, name, hardware);
 }
 
 cl_mem sclMalloc( sclHard hardware, cl_int mode, size_t size ){
@@ -1040,10 +1049,9 @@ void sclSetKernelArgs( sclSoft software, const char *sizesValues, ... ){
 
 }
 
-cl_event sclSetArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
+void sclSetArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
 				const char *sizesValues, ... ) {
 	va_list argList;
-	cl_event event;
 
 	va_start( argList, sizesValues );
 	
@@ -1051,16 +1059,15 @@ cl_event sclSetArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *glo
 	
 	va_end( argList );
 
-	event = sclLaunchKernel( hardware, software, global_work_size, local_work_size );
+	sclLaunchKernel( hardware, software, global_work_size, local_work_size );
 
-	return event;
+	return;
 
 }
 
-cl_event sclSetArgsEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
+void sclSetArgsEnqueueKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
 				 const char *sizesValues, ... ) {
 	va_list argList;
-	cl_event event;
 
 	va_start( argList, sizesValues );
 	
@@ -1068,17 +1075,15 @@ cl_event sclSetArgsEnqueueKernel( sclHard hardware, sclSoft software, size_t *gl
 	
 	va_end( argList );
 
-	event = sclEnqueueKernel( hardware, software, global_work_size, local_work_size );
+	sclEnqueueKernel( hardware, software, global_work_size, local_work_size );
 
-	return event;
+	return;
 	
 
 }
 
-cl_event sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size,
-				    const char* sizesValues, ... ) {
+void sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *global_work_size, size_t *local_work_size, const char* sizesValues, ...) {
 	va_list argList;
-	cl_event event;
 	const char *p;
 	int argCount = 0, outArgCount = 0, inArgCount = 0, i;
 	void* argument;
@@ -1155,7 +1160,7 @@ cl_event sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *
 	
 	va_end( argList );
 
-	event = sclLaunchKernel( hardware, software, global_work_size, local_work_size );
+	sclLaunchKernel(hardware, software, global_work_size, local_work_size);
 	
 	for ( i = 0; i < outArgCount; i++ ) {
 		sclRead( hardware, sizesOut[i], outBuffs[i], outArgs[i] );		
@@ -1171,7 +1176,7 @@ cl_event sclManageArgsLaunchKernel( sclHard hardware, sclSoft software, size_t *
 		sclReleaseMemObject( inBuffs[i] );
 	}
 
-	return event;
+	return;
 }
 
 void sclPrintDeviceArrayInt( sclHard hardware, cl_mem buffer, size_t num, size_t offset) {
